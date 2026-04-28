@@ -235,6 +235,24 @@
         .badge-freespins { background: #00bfa5; color: #000; }
         @keyframes badgeGlow { from { box-shadow: 0 0 8px currentColor; } to { box-shadow: 0 0 22px currentColor; } }
 
+        /* Панель отладки */
+        .debug-panel {
+            background: rgba(0,0,0,0.85);
+            border-radius: 12px;
+            padding: 8px 12px;
+            font-size: 0.65rem;
+            font-family: monospace;
+            color: #0f0;
+            margin-top: 10px;
+            text-align: left;
+            max-height: 80px;
+            overflow-y: auto;
+            border: 1px solid #00ff00;
+        }
+        .debug-panel span {
+            color: #ff0;
+        }
+
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -274,6 +292,7 @@
             .btn { padding: 9px 14px; font-size: 0.85rem; }
             .cell[data-symbol="👑"] { font-size: 1.8rem; }
             .cell[data-symbol="👑"]::after { font-size: 0.38rem; bottom: -3px; }
+            .debug-panel { font-size: 0.55rem; max-height: 60px; }
         }
     </style>
 </head>
@@ -322,17 +341,39 @@
             <button class="btn spin" id="spinBtn">🌀 ВРАЩАТЬ</button>
             <button class="btn" id="anteBetBtn">⭐ Ante</button>
         </div>
-        <div style="margin-top: 10px; text-align: center;">
-            <button class="btn btn-sync" id="syncBtn">💾 СОХРАНИТЬ БАЛАНС В БОТА</button>
+        
+        <!-- Панель отладки - показывает что отправляется в бота -->
+        <div class="debug-panel" id="debugPanel">
+            📡 [Ожидание действий] <span id="debugStatus">🟢 Готов</span>
+        </div>
+        
+        <div style="margin-top: 5px; text-align: center;">
+            <button class="btn btn-sync" id="syncBtn" style="background: linear-gradient(180deg, #2e7d32, #1b5e20);">💾 СОХРАНИТЬ БАЛАНС</button>
         </div>
     </div>
 
     <script>
+        // ============ ИНИЦИАЛИЗАЦИЯ ============
         const tg = window.Telegram?.WebApp;
         let userId = null;
         let isConnectedToBot = false;
+        
+        // Функция для добавления сообщений в панель отладки
+        function addDebugMessage(msg, isError = false) {
+            const panel = document.getElementById('debugPanel');
+            const time = new Date().toLocaleTimeString();
+            const color = isError ? '#ff6666' : '#88ff88';
+            panel.innerHTML = `📡 [${time}] <span style="color:${color}">${msg}</span><br>${panel.innerHTML}`;
+            // Оставляем не больше 5 строк
+            const lines = panel.innerHTML.split('<br>');
+            if (lines.length > 6) {
+                panel.innerHTML = lines.slice(0, 6).join('<br>');
+            }
+            console.log(msg);
+        }
 
         function initTelegram() {
+            addDebugMessage('Инициализация Telegram...');
             if (tg) {
                 tg.ready();
                 tg.expand();
@@ -341,6 +382,7 @@
                 if (initData && initData.user) {
                     userId = initData.user.id;
                     isConnectedToBot = true;
+                    addDebugMessage(`✅ User ID из Telegram: ${userId}`);
                     document.getElementById('connectionStatus').textContent = '🟢 Подключено к боту';
                     document.getElementById('connectionStatus').classList.remove('disconnected');
                 } else {
@@ -348,33 +390,49 @@
                     userId = params.get('user_id');
                     if (userId) {
                         isConnectedToBot = true;
+                        addDebugMessage(`✅ User ID из URL: ${userId}`);
+                        document.getElementById('connectionStatus').textContent = '🟢 Подключено к боту';
+                        document.getElementById('connectionStatus').classList.remove('disconnected');
                     } else {
+                        addDebugMessage('❌ Нет user_id! Демо-режим', true);
                         document.getElementById('connectionStatus').textContent = '🔴 Демо-режим';
                         document.getElementById('connectionStatus').classList.add('disconnected');
                     }
                 }
             } else {
+                addDebugMessage('❌ Telegram WebApp API не найден', true);
                 const params = new URLSearchParams(window.location.search);
-                userId = params.get('user_id') || 'test_user';
-                document.getElementById('connectionStatus').textContent = '🟡 Тестовый режим';
-                document.getElementById('connectionStatus').classList.add('disconnected');
+                userId = params.get('user_id');
+                if (userId && userId !== 'test_user') {
+                    isConnectedToBot = true;
+                    addDebugMessage(`⚠️ Telegram API нет, но user_id есть: ${userId}`);
+                } else {
+                    document.getElementById('connectionStatus').textContent = '🟡 Тестовый режим';
+                }
             }
         }
 
+        // Отправка данных в бота
         function sendToBot(data) {
-            if (tg && isConnectedToBot) {
-                tg.sendData(JSON.stringify(data));
-                console.log('Sent to bot:', data);
+            if (tg && isConnectedToBot && userId) {
+                const message = JSON.stringify(data);
+                tg.sendData(message);
+                addDebugMessage(`📤 Отправлено: ставка=${data.bet || 0}, выигрыш=${data.win || 0}, баланс=${data.balance_after || 0}`);
                 return true;
+            } else {
+                addDebugMessage(`❌ Не отправлено: tg=${!!tg}, connected=${isConnectedToBot}, userId=${userId}`, true);
+                return false;
             }
-            return false;
         }
 
-        // Функция синхронизации баланса с ботом
+        // Синхронизация баланса с ботом
         function syncBalanceToBot(bet, win, balanceAfter) {
-            if (!isConnectedToBot) return false;
+            if (!isConnectedToBot || !userId) {
+                addDebugMessage('❌ Синхронизация пропущена - нет подключения', true);
+                return false;
+            }
             
-            sendToBot({
+            const result = sendToBot({
                 action: 'spin_result',
                 user_id: userId,
                 bet: bet,
@@ -383,77 +441,22 @@
                 timestamp: new Date().toISOString()
             });
             
-            document.getElementById('syncStatus').textContent = 'синхронизация...';
-            document.getElementById('syncStatus').style.color = '#ffaa00';
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.textContent = 'отправка...';
+            syncStatus.style.color = '#ffaa00';
             
             setTimeout(() => {
-                document.getElementById('syncStatus').textContent = 'синхронизировано ✓';
-                document.getElementById('syncStatus').style.color = '#00e676';
+                syncStatus.textContent = 'синхронизировано ✓';
+                syncStatus.style.color = '#00e676';
             }, 1000);
             
-            return true;
+            return result;
         }
 
-        // Музыка
-        let musicEnabled = true;
-        let backgroundMusic = null;
-        let musicVolume = 0.15;
-
-        function createBackgroundMusic() {
-            const audioCtx = new(window.AudioContext || window.webkitAudioContext)();
-            
-            function playMelodyNote(freq, startTime, duration, gainNode) {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(freq, startTime);
-                gain.gain.setValueAtTime(0, startTime);
-                gain.gain.linearRampToValueAtTime(musicVolume, startTime + 0.05);
-                gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-                osc.connect(gain);
-                gain.connect(gainNode);
-                osc.start(startTime);
-                osc.stop(startTime + duration);
-            }
-
-            const melodyNotes = [262, 330, 392, 523, 330, 392, 523, 659, 294, 370, 440, 587, 330, 392, 523, 659];
-            const chordNotes = [[262, 330, 392], [294, 370, 440], [330, 392, 523], [262, 330, 392]];
-
-            function playMelodyLoop() {
-                if (!musicEnabled) return;
-                const now = audioCtx.currentTime;
-                const masterGain = audioCtx.createGain();
-                masterGain.gain.setValueAtTime(musicVolume, now);
-                masterGain.connect(audioCtx.destination);
-
-                melodyNotes.forEach((note, i) => playMelodyNote(note, now + i * 0.5, 0.4, masterGain));
-                chordNotes.forEach((chord, ci) => chord.forEach(note => playMelodyNote(note, now + ci * 2, 1.8, masterGain)));
-
-                setTimeout(playMelodyLoop, (melodyNotes.length * 0.5 * 1000) - 100);
-            }
-
-            playMelodyLoop();
-            return { stop: () => { musicEnabled = false; audioCtx.close(); } };
-        }
-
-        function toggleMusic() {
-            const btn = document.getElementById('musicToggle');
-            if (musicEnabled) {
-                musicEnabled = false;
-                btn.textContent = '🔇';
-                btn.classList.add('muted');
-                if (backgroundMusic) { backgroundMusic.stop(); backgroundMusic = null; }
-            } else {
-                musicEnabled = true;
-                btn.textContent = '🎵';
-                btn.classList.remove('muted');
-                backgroundMusic = createBackgroundMusic();
-            }
-        }
-
-        // Конфиг слота
+        // ============ КОНФИГУРАЦИЯ СЛОТА ============
         const ROWS = 5;
         const COLS = 6;
+        const TOTAL_CELLS = ROWS * COLS;
         const MAX_WIN_MULTIPLIER = 10000;
 
         const SYMBOL_CONFIG = {
@@ -477,6 +480,7 @@
             { value: 100, weight: 4 }, { value: 250, weight: 1 }, { value: 500, weight: 1 },
         ];
 
+        // ============ АУДИО ============
         let sfxAudioCtx = null;
         function initSFX() { if (!sfxAudioCtx) sfxAudioCtx = new(window.AudioContext || window.webkitAudioContext)(); if (sfxAudioCtx.state === 'suspended') sfxAudioCtx.resume(); }
         function playTone(freq, duration, type = 'sine', vol = 0.08) { if (!sfxAudioCtx) return; try { const osc = sfxAudioCtx.createOscillator(); const gain = sfxAudioCtx.createGain(); osc.type = type; osc.frequency.setValueAtTime(freq, sfxAudioCtx.currentTime); gain.gain.setValueAtTime(vol, sfxAudioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, sfxAudioCtx.currentTime + duration); osc.connect(gain); gain.connect(sfxAudioCtx.destination); osc.start(); osc.stop(sfxAudioCtx.currentTime + duration); } catch(e) {} }
@@ -487,6 +491,7 @@
         function soundBonusTrigger() { playTone(600, 0.2, 'sine', 0.12); setTimeout(() => playTone(800, 0.2, 'sine', 0.12), 200); setTimeout(() => playTone(1000, 0.3, 'sine', 0.15), 400); }
         function soundDrop() { playTone(150, 0.05, 'triangle', 0.04); }
 
+        // ============ МОДАЛЬНЫЕ ОКНА ============
         function showModal(title, amount, subtitle = '', duration = 3000) {
             const container = document.getElementById('modalContainer');
             const overlay = document.createElement('div');
@@ -499,6 +504,7 @@
             if (duration > 0) setTimeout(closeModal, duration);
         }
 
+        // ============ СОСТОЯНИЕ ============
         let balance = 0;
         let currentBet = 25;
         let anteBetActive = false;
@@ -512,6 +518,7 @@
         const MULTIPLIER_DROP_INTERVAL_MIN = 3;
         const MULTIPLIER_DROP_INTERVAL_MAX = 7;
 
+        // ============ DOM ЭЛЕМЕНТЫ ============
         const gridEl = document.getElementById('grid');
         const balanceEl = document.getElementById('balanceDisplay');
         const winInfoEl = document.getElementById('winInfo');
@@ -523,6 +530,7 @@
         const betSelect = document.getElementById('betSelect');
         const syncBtn = document.getElementById('syncBtn');
 
+        // ============ ЗВЁЗДЫ ============
         function createStars() {
             const container = document.getElementById('starsLayer');
             for (let i = 0; i < 100; i++) {
@@ -539,6 +547,7 @@
             }
         }
 
+        // ============ ГЕНЕРАЦИЯ ============
         function resetMultiplierDropTimer() { multiplierDropAllowed = false; multiplierDropCounter = Math.floor(Math.random() * (MULTIPLIER_DROP_INTERVAL_MAX - MULTIPLIER_DROP_INTERVAL_MIN + 1)) + MULTIPLIER_DROP_INTERVAL_MIN; }
         function tickMultiplierTimer() { multiplierDropCounter--; if (multiplierDropCounter <= 0) multiplierDropAllowed = true; }
 
@@ -577,6 +586,7 @@
             return g;
         }
 
+        // ============ ВЫИГРЫШИ ============
         function findWinningCombos(g) {
             const counts = {};
             for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const sym = g[r][c].symbol; if (sym === SCATTER || sym === MULTIPLIER_SYMBOL || !sym) continue; counts[sym] = (counts[sym] || 0) + 1; }
@@ -589,6 +599,7 @@
         function collectMultipliers(g) { let total = 0; for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (g[r][c].symbol === MULTIPLIER_SYMBOL && g[r][c].multiplier) total += g[r][c].multiplier; return total; }
         function getWinningSymbolsSet(combos) { return new Set(Object.keys(combos)); }
 
+        // ============ ОТРИСОВКА ============
         function renderGrid(winningSyms = new Set()) {
             gridEl.innerHTML = '';
             for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
@@ -606,6 +617,7 @@
             }
         }
 
+        // ============ КАСКАД ============
         function removeWinningAndCascade(winningSyms) {
             for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const sym = grid[r][c].symbol; if (winningSyms.has(sym) && sym !== SCATTER && sym !== MULTIPLIER_SYMBOL) grid[r][c].removing = true; if (sym === MULTIPLIER_SYMBOL) grid[r][c].removing = true; }
             renderGrid(winningSyms);
@@ -630,7 +642,7 @@
 
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-        // ОСНОВНАЯ ФУНКЦИЯ ВРАЩЕНИЯ С ОТПРАВКОЙ В БОТА
+        // ============ ГЛАВНЫЙ ЦИКЛ ============
         async function performSpin(isFreeSpin = false) {
             if (isSpinning) return;
             initSFX();
@@ -639,7 +651,6 @@
             buyBonusBtn.disabled = true;
             anteBetBtn.disabled = true;
 
-            let betAmount = currentBet;
             let oldBalance = balance;
 
             if (!isFreeSpin && freespinsRemaining === 0) {
@@ -651,6 +662,7 @@
                 }
                 balance -= currentBet;
                 tickMultiplierTimer();
+                addDebugMessage(`💰 Спин: ставка ${currentBet}, баланс был ${oldBalance}, стал ${balance}`);
             }
             updateBalanceDisplay();
             soundSpin();
@@ -720,6 +732,7 @@
                 balance += totalWin;
                 bonusTotalWin += totalWin;
                 winInfoEl.textContent = `🏆 Выигрыш: ${totalWin}`;
+                addDebugMessage(`🎉 Выигрыш: +${totalWin}, новый баланс: ${balance}`);
                 if (totalWin >= currentBet * 20) { 
                     soundBigWin(); 
                     showModal('💎 КРУПНЫЙ ВЫИГРЫШ! 💎', totalWin, totalWin >= currentBet * MAX_WIN_MULTIPLIER ? 'MAX WIN!' : 'Поздравляем!', 3500); 
@@ -727,8 +740,8 @@
             }
             updateBalanceDisplay();
 
-            // ОТПРАВЛЯЕМ РЕЗУЛЬТАТ В БОТА
-            let netChange = totalWin - (oldBalance - balance);
+            // ОТПРАВКА В БОТА - КЛЮЧЕВОЙ МОМЕНТ!
+            addDebugMessage(`🔄 Отправка в бота: ставка=${currentBet}, выигрыш=${totalWin}, баланс=${balance}`);
             syncBalanceToBot(currentBet, totalWin, balance);
 
             if (freespinsRemaining > 0) {
@@ -801,18 +814,20 @@
             if (balanceParam) {
                 balance = parseFloat(balanceParam) || 0;
                 updateBalanceDisplay();
-                console.log('Balance loaded from URL:', balance);
+                addDebugMessage(`💰 Баланс загружен из URL: ${balance}`);
+            } else {
+                addDebugMessage(`⚠️ Баланс не передан в URL`, true);
             }
             updateBalanceDisplay();
-            document.getElementById('syncStatus').textContent = userId ? 'синхронизировано ✓' : 'демо-режим';
         }
 
-        // Кнопка ручной синхронизации
+        // Ручная синхронизация
         function manualSync() {
             if (!isConnectedToBot) {
-                alert('❌ Нет подключения к боту');
+                addDebugMessage('❌ Нет подключения к боту для синхронизации!', true);
                 return;
             }
+            addDebugMessage(`🔄 Ручная синхронизация: баланс=${balance}`);
             syncBalanceToBot(0, 0, balance);
             winInfoEl.textContent = '💾 Баланс сохранён в боте!';
             setTimeout(() => {
@@ -820,6 +835,64 @@
             }, 2000);
         }
 
+        // ============ МУЗЫКА ============
+        let musicEnabled = true;
+        let backgroundMusic = null;
+        let musicVolume = 0.15;
+
+        function createBackgroundMusic() {
+            const audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+            
+            function playMelodyNote(freq, startTime, duration, gainNode) {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, startTime);
+                gain.gain.setValueAtTime(0, startTime);
+                gain.gain.linearRampToValueAtTime(musicVolume, startTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+                osc.connect(gain);
+                gain.connect(gainNode);
+                osc.start(startTime);
+                osc.stop(startTime + duration);
+            }
+
+            const melodyNotes = [262, 330, 392, 523, 330, 392, 523, 659, 294, 370, 440, 587, 330, 392, 523, 659];
+            const chordNotes = [[262, 330, 392], [294, 370, 440], [330, 392, 523], [262, 330, 392]];
+
+            function playMelodyLoop() {
+                if (!musicEnabled) return;
+                const now = audioCtx.currentTime;
+                const masterGain = audioCtx.createGain();
+                masterGain.gain.setValueAtTime(musicVolume, now);
+                masterGain.connect(audioCtx.destination);
+
+                melodyNotes.forEach((note, i) => playMelodyNote(note, now + i * 0.5, 0.4, masterGain));
+                chordNotes.forEach((chord, ci) => chord.forEach(note => playMelodyNote(note, now + ci * 2, 1.8, masterGain)));
+
+                setTimeout(playMelodyLoop, (melodyNotes.length * 0.5 * 1000) - 100);
+            }
+
+            playMelodyLoop();
+            return { stop: () => { musicEnabled = false; audioCtx.close(); } };
+        }
+
+        function toggleMusic() {
+            const btn = document.getElementById('musicToggle');
+            if (musicEnabled) {
+                musicEnabled = false;
+                btn.textContent = '🔇';
+                btn.classList.add('muted');
+                if (backgroundMusic) { backgroundMusic.stop(); backgroundMusic = null; }
+            } else {
+                musicEnabled = true;
+                btn.textContent = '🎵';
+                btn.classList.remove('muted');
+                backgroundMusic = createBackgroundMusic();
+            }
+        }
+
+        // ============ СОБЫТИЯ ============
         spinBtn.addEventListener('click', () => { if (isSpinning) return; initSFX(); if (freespinsRemaining > 0) performSpin(true); else { grid = generateGrid(); performSpin(false); } });
         buyBonusBtn.addEventListener('click', buyBonus);
         syncBtn.addEventListener('click', manualSync);
@@ -827,6 +900,7 @@
         betSelect.addEventListener('change', (e) => { currentBet = parseInt(e.target.value); anteBetActive = false; anteBetBtn.style.background = 'linear-gradient(180deg, #6d3796, #3b1554)'; anteBetBtn.textContent = '⭐ Ante'; winInfoEl.textContent = '🎰 Ставка: ' + currentBet; });
         document.getElementById('musicToggle').addEventListener('click', toggleMusic);
 
+        // ============ ИНИЦИАЛИЗАЦИЯ ============
         function init() {
             initTelegram();
             createStars();
@@ -837,6 +911,7 @@
             updateButtons();
             backgroundMusic = createBackgroundMusic();
             winInfoEl.textContent = '🎰 Money Star • Telegram Casino';
+            addDebugMessage('✨ Игра загружена!');
         }
 
         init();
