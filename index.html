@@ -1,46 +1,925 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>✨ Money Star — Telegram Casino ✨</title>
+    
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <style>
+        :root {
+            --bg-deep: #0a0015;
+            --gold: #ffd966;
+            --pink: #ffb3ec;
+            --purple: #b266ff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: radial-gradient(ellipse at 50% 30%, #1a1040 0%, #0a0015 60%, #000010 100%);
+            font-family: 'Georgia', 'Times New Roman', serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            position: relative;
+        }
+
+        .stars-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .star-particle {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkleStar var(--dur) ease-in-out infinite;
+            animation-delay: var(--delay);
+            opacity: 0;
+        }
+        @keyframes twinkleStar {
+            0%, 100% { opacity: 0.15; transform: scale(1); }
+            50% { opacity: 1; transform: scale(2.2); }
+        }
+
+        .music-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(30, 10, 50, 0.8);
+            border: 2px solid rgba(200, 160, 255, 0.6);
+            color: #ffd966;
+            font-size: 1.4rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+        }
+        .music-toggle:hover { box-shadow: 0 0 30px rgba(255, 200, 0, 0.5); border-color: #ffd966; }
+        .music-toggle.muted { opacity: 0.5; border-color: rgba(255, 100, 100, 0.5); }
+
+        .slot-machine {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 550px;
+            background: linear-gradient(180deg, rgba(30, 10, 50, 0.75) 0%, rgba(15, 5, 30, 0.9) 50%, rgba(10, 0, 20, 0.95) 100%);
+            backdrop-filter: blur(25px);
+            border-radius: 44px;
+            padding: 22px 20px 30px;
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.8), 0 0 50px rgba(180, 100, 255, 0.3), inset 0 1px 0 rgba(255,255,255,0.08);
+            border: 2px solid rgba(200, 160, 255, 0.4);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .ornament-border {
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            border-radius: 47px;
+            background: linear-gradient(135deg, rgba(255,215,0,0.5), rgba(255,100,200,0.5), rgba(100,200,255,0.5), rgba(255,215,0,0.5)) border-box;
+            -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            z-index: -1;
+            animation: borderShine 4s linear infinite;
+        }
+        @keyframes borderShine { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+
+        .title-area { text-align: center; }
+        .title { font-size: 2.2rem; font-weight: 900; letter-spacing: 3px; background: linear-gradient(180deg, #ffe9a0 0%, #ffb347 40%, #ff8c00 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 18px rgba(255,180,0,0.7)); margin-bottom: 2px; }
+        .subtitle { font-size: 0.7rem; letter-spacing: 3px; color: #c9a0dc; text-transform: uppercase; }
+        .connection-status { text-align: center; font-size: 0.7rem; padding: 4px 12px; border-radius: 20px; background: rgba(0,200,100,0.2); color: #00e676; display: inline-block; margin: 0 auto; }
+        .connection-status.disconnected { background: rgba(255,50,50,0.2); color: #ff5252; }
+
+        .balance-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 50px;
+            padding: 10px 24px;
+            border: 2px solid #c792ea;
+            box-shadow: 0 0 22px rgba(200, 120, 255, 0.35);
+        }
+        .balance-label { font-size: 1rem; font-weight: 700; color: #ffe5b4; }
+        .balance-value { font-size: 2rem; font-weight: 900; color: #fff3c9; text-shadow: 0 0 22px #ffbb00; transition: all 0.3s; }
+        .balance-synced { font-size: 0.6rem; color: #00e676; text-align: right; margin-top: -5px; }
+
+        .grid-wrapper {
+            position: relative;
+            background: rgba(0, 0, 0, 0.55);
+            border-radius: 26px;
+            padding: 10px;
+            border: 2px solid #a86fd6;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.7), 0 0 35px rgba(150,80,220,0.4);
+            overflow: hidden;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            grid-template-rows: repeat(5, 1fr);
+            gap: 6px;
+            position: relative;
+            z-index: 1;
+        }
+        .cell {
+            aspect-ratio: 1 / 1;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            position: relative;
+        }
+        .cell[data-symbol="💎"] { background: radial-gradient(circle at 35% 35%, #e0f7fa, #0097a7); box-shadow: inset 0 -4px 0 rgba(0,0,0,0.5), 0 6px 14px rgba(0,200,220,0.5); }
+        .cell[data-symbol="❤️"] { background: radial-gradient(circle at 35% 35%, #ffcdd2, #c62828); box-shadow: inset 0 -4px 0 rgba(0,0,0,0.5), 0 6px 14px rgba(255,50,50,0.5); }
+        .cell[data-symbol="🌙"] { background: radial-gradient(circle at 35% 35%, #fff9c4, #f9a825); box-shadow: inset 0 -4px 0 rgba(0,0,0,0.5), 0 6px 14px rgba(255,200,0,0.5); }
+        .cell[data-symbol="⭐"] { background: radial-gradient(circle at 35% 35%, #fff8e1, #ff8f00); box-shadow: inset 0 -4px 0 rgba(0,0,0,0.5), 0 6px 14px rgba(255,150,0,0.5); }
+        .cell[data-symbol="🔮"] { background: radial-gradient(circle at 35% 35%, #e1bee7, #7b1fa2); box-shadow: inset 0 -4px 0 rgba(0,0,0,0.5), 0 6px 14px rgba(150,0,200,0.5); }
+        .cell[data-symbol="🍀"] { background: radial-gradient(circle at 35% 35%, #c8e6c9, #2e7d32); box-shadow: inset 0 -4px 0 rgba(0,0,0,0.5), 0 6px 14px rgba(0,180,0,0.5); }
+        .cell[data-symbol="🎀"] { background: radial-gradient(circle at 35% 35%, #f8bbd0, #ad1457); box-shadow: inset 0 -4px 0 rgba(0,0,0,0.5), 0 6px 14px rgba(255,80,150,0.5); }
+        .cell[data-symbol="🦋"] { background: radial-gradient(circle at 35% 35%, #b3e5fc, #0277bd); box-shadow: inset 0 -4px 0 rgba(0,0,0,0.5), 0 6px 14px rgba(0,150,255,0.5); }
+        .cell[data-symbol="👑"] { background: radial-gradient(circle at 35% 35%, #fff3e0, #e65100); box-shadow: inset 0 -4px 0 rgba(0,0,0,0.5), 0 6px 14px rgba(255,180,0,0.7), 0 0 25px rgba(255,200,0,0.6); animation: scatterGlow 1.5s ease-in-out infinite alternate; font-size: 2.2rem; }
+        .cell[data-symbol="👑"]::after { content: 'SCATTER'; position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); font-size: 0.45rem; font-weight: 900; color: #ffd966; text-shadow: 0 0 8px #ff8c00; background: rgba(0,0,0,0.5); padding: 1px 4px; border-radius: 4px; white-space: nowrap; pointer-events: none; }
+        @keyframes scatterGlow { from { box-shadow: 0 0 15px rgba(255,200,0,0.6); } to { box-shadow: 0 0 30px rgba(255,200,0,1), 0 0 50px rgba(255,150,0,0.7); } }
+        .cell.multiplier-cell { background: radial-gradient(circle at 35% 35%, #ff80ab, #880e4f) !important; box-shadow: inset 0 -4px 0 rgba(0,0,0,0.5), 0 6px 18px rgba(255,20,100,0.7) !important; font-size: 1.2rem; font-weight: 900; color: #fff; text-shadow: 0 0 10px #000; animation: pulseMultiplier 1s ease-in-out infinite alternate; }
+        @keyframes pulseMultiplier { from { box-shadow: 0 0 18px rgba(255,20,100,0.6); } to { box-shadow: 0 0 35px rgba(255,20,100,1); } }
+        .cell.win { animation: winPop 0.5s ease-out; box-shadow: 0 0 30px #ffd700, 0 0 55px #ff8c00 !important; }
+        @keyframes winPop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.2); } }
+        .cell.removing { animation: fadeOutCell 0.4s forwards; }
+        @keyframes fadeOutCell { to { opacity: 0; transform: scale(0.3) rotate(15deg); } }
+        .cell.dropping { animation: dropInCell 0.5s cubic-bezier(0.25,0.46,0.45,0.94) forwards; }
+        @keyframes dropInCell { 0% { opacity: 0; transform: translateY(-80px); } 60% { opacity: 0.9; transform: translateY(4px); } 80% { transform: translateY(-2px); } 100% { opacity: 1; transform: translateY(0); } }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+        }
+        .bet-select {
+            background: linear-gradient(180deg, #3d1a5c, #1f0a30);
+            color: #fff;
+            border: 2px solid #a86fd6;
+            border-radius: 30px;
+            padding: 10px 16px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            outline: none;
+        }
+        .btn {
+            background: linear-gradient(180deg, #6d3796, #3b1554);
+            border: 2px solid #d4a0ff;
+            color: #fff;
+            font-weight: 700;
+            padding: 11px 22px;
+            border-radius: 36px;
+            font-size: 1rem;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: all 0.2s;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+            white-space: nowrap;
+            text-transform: uppercase;
+        }
+        .btn:hover { background: linear-gradient(180deg, #8e4fb8, #54207a); border-color: #ffe484; box-shadow: 0 0 30px #c580ff; transform: translateY(-2px); }
+        .btn:active { transform: scale(0.94); }
+        .btn.spin { background: linear-gradient(180deg, #ff8c3a, #c43c00); border-color: #ffcc80; font-size: 1.4rem; flex: 2; min-width: 150px; box-shadow: 0 0 35px #ff6d00; letter-spacing: 2px; }
+        .btn:disabled { opacity: 0.4; pointer-events: none; filter: grayscale(0.4); }
+        .btn-sync { background: linear-gradient(180deg, #2e7d32, #1b5e20); border-color: #66bb6a; font-size: 0.8rem; padding: 8px 12px; }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: #e6c6ff;
+            background: rgba(0, 0, 0, 0.35);
+            border-radius: 22px;
+            padding: 8px 18px;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .badge { padding: 5px 16px; border-radius: 20px; font-weight: 800; letter-spacing: 1px; animation: badgeGlow 1.5s ease-in-out infinite alternate; }
+        .badge-multiplier { background: #ff4081; color: #fff; }
+        .badge-freespins { background: #00bfa5; color: #000; }
+        @keyframes badgeGlow { from { box-shadow: 0 0 8px currentColor; } to { box-shadow: 0 0 22px currentColor; } }
+
+        /* Панель отладки */
+        .debug-panel {
+            background: rgba(0,0,0,0.85);
+            border-radius: 12px;
+            padding: 8px 12px;
+            font-size: 0.65rem;
+            font-family: monospace;
+            color: #0f0;
+            margin-top: 10px;
+            text-align: left;
+            max-height: 80px;
+            overflow-y: auto;
+            border: 1px solid #00ff00;
+        }
+        .debug-panel span {
+            color: #ff0;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-box {
+            background: linear-gradient(180deg, #2d1154, #1a0b2e);
+            border: 3px solid #ffd966;
+            border-radius: 32px;
+            padding: 30px 24px;
+            text-align: center;
+            box-shadow: 0 0 60px #ffb800;
+            animation: modalPop 0.5s ease-out;
+            max-width: 400px;
+            width: 90%;
+        }
+        @keyframes modalPop { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.05); } 100% { transform: scale(1); opacity: 1; } }
+        .modal-title { font-size: 2rem; font-weight: 900; color: #ffd966; text-shadow: 0 0 25px #ffb800; margin-bottom: 10px; }
+        .modal-amount { font-size: 3rem; font-weight: 900; background: linear-gradient(180deg, #fff, #ffd966); -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: pulseText 0.5s infinite alternate; }
+        @keyframes pulseText { from { transform: scale(1); } to { transform: scale(1.08); } }
+        .modal-subtitle { color: #e6c6ff; margin: 8px 0 20px; font-size: 1rem; }
+        .modal-btn { background: linear-gradient(180deg, #ffb347, #e65100); border: none; color: #fff; font-weight: 800; padding: 12px 36px; border-radius: 30px; font-size: 1.2rem; cursor: pointer; box-shadow: 0 0 20px #ff8c00; }
+
+        @media (max-width: 480px) {
+            .slot-machine { padding: 16px 10px 22px; border-radius: 32px; }
+            .title { font-size: 1.6rem; }
+            .cell { font-size: 1.3rem; border-radius: 10px; }
+            .btn { padding: 9px 14px; font-size: 0.85rem; }
+            .cell[data-symbol="👑"] { font-size: 1.8rem; }
+            .cell[data-symbol="👑"]::after { font-size: 0.38rem; bottom: -3px; }
+            .debug-panel { font-size: 0.55rem; max-height: 60px; }
+        }
+    </style>
 </head>
 <body>
-    <h1>Тест отправки в бота</h1>
-    <button id="testBtn">Отправить тест</button>
-    <div id="status"></div>
-    
+
+    <button class="music-toggle" id="musicToggle" title="Вкл/Выкл музыку">🎵</button>
+
+    <div class="stars-layer" id="starsLayer"></div>
+    <div id="modalContainer"></div>
+
+    <div class="slot-machine" id="slotMachine">
+        <div class="ornament-border"></div>
+        <div class="title-area">
+            <div class="title">✨ Money Star ✨</div>
+            <div class="subtitle">⚜ TELEGRAM CASINO • MAX WIN 10,000x ⚜</div>
+            <div class="connection-status" id="connectionStatus">🟢 Подключено к боту</div>
+        </div>
+
+        <div class="balance-row">
+            <div>
+                <span class="balance-label">💎 Баланс</span>
+                <div class="balance-synced" id="syncStatus">синхронизировано</div>
+            </div>
+            <span class="balance-value" id="balanceDisplay">0</span>
+        </div>
+
+        <div class="grid-wrapper">
+            <div class="grid" id="grid"></div>
+        </div>
+
+        <div class="info-row">
+            <span id="winInfo" style="flex:1; text-align:center;">🎰 Сделайте ставку</span>
+            <span id="multiplierBadge" class="badge badge-multiplier" style="display:none;">💥 x1</span>
+            <span id="freespinsBadge" class="badge badge-freespins" style="display:none;">🌀 0</span>
+        </div>
+
+        <div class="controls">
+            <select class="bet-select" id="betSelect">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="250">250</option>
+            </select>
+            <button class="btn" id="buyBonusBtn">🛒 Бонус</button>
+            <button class="btn spin" id="spinBtn">🌀 ВРАЩАТЬ</button>
+            <button class="btn" id="anteBetBtn">⭐ Ante</button>
+        </div>
+        
+        <!-- Панель отладки - показывает что отправляется в бота -->
+        <div class="debug-panel" id="debugPanel">
+            📡 [Ожидание действий] <span id="debugStatus">🟢 Готов</span>
+        </div>
+        
+        <div style="margin-top: 5px; text-align: center;">
+            <button class="btn btn-sync" id="syncBtn" style="background: linear-gradient(180deg, #2e7d32, #1b5e20);">💾 СОХРАНИТЬ БАЛАНС</button>
+        </div>
+    </div>
+
     <script>
+        // ============ ИНИЦИАЛИЗАЦИЯ ============
         const tg = window.Telegram?.WebApp;
         let userId = null;
+        let isConnectedToBot = false;
         
-        // Получаем user_id из URL
-        const params = new URLSearchParams(window.location.search);
-        userId = params.get('user_id');
-        
-        if (tg) {
-            tg.ready();
-            tg.expand();
+        // Функция для добавления сообщений в панель отладки
+        function addDebugMessage(msg, isError = false) {
+            const panel = document.getElementById('debugPanel');
+            const time = new Date().toLocaleTimeString();
+            const color = isError ? '#ff6666' : '#88ff88';
+            panel.innerHTML = `📡 [${time}] <span style="color:${color}">${msg}</span><br>${panel.innerHTML}`;
+            // Оставляем не больше 5 строк
+            const lines = panel.innerHTML.split('<br>');
+            if (lines.length > 6) {
+                panel.innerHTML = lines.slice(0, 6).join('<br>');
+            }
+            console.log(msg);
         }
-        
-        document.getElementById('testBtn').onclick = function() {
-            if (!tg || !userId) {
-                document.getElementById('status').innerHTML = '❌ Нет подключения к боту';
-                return;
+
+        function initTelegram() {
+            addDebugMessage('Инициализация Telegram...');
+            if (tg) {
+                tg.ready();
+                tg.expand();
+                
+                const initData = tg.initDataUnsafe;
+                if (initData && initData.user) {
+                    userId = initData.user.id;
+                    isConnectedToBot = true;
+                    addDebugMessage(`✅ User ID из Telegram: ${userId}`);
+                    document.getElementById('connectionStatus').textContent = '🟢 Подключено к боту';
+                    document.getElementById('connectionStatus').classList.remove('disconnected');
+                } else {
+                    const params = new URLSearchParams(window.location.search);
+                    userId = params.get('user_id');
+                    if (userId) {
+                        isConnectedToBot = true;
+                        addDebugMessage(`✅ User ID из URL: ${userId}`);
+                        document.getElementById('connectionStatus').textContent = '🟢 Подключено к боту';
+                        document.getElementById('connectionStatus').classList.remove('disconnected');
+                    } else {
+                        addDebugMessage('❌ Нет user_id! Демо-режим', true);
+                        document.getElementById('connectionStatus').textContent = '🔴 Демо-режим';
+                        document.getElementById('connectionStatus').classList.add('disconnected');
+                    }
+                }
+            } else {
+                addDebugMessage('❌ Telegram WebApp API не найден', true);
+                const params = new URLSearchParams(window.location.search);
+                userId = params.get('user_id');
+                if (userId && userId !== 'test_user') {
+                    isConnectedToBot = true;
+                    addDebugMessage(`⚠️ Telegram API нет, но user_id есть: ${userId}`);
+                } else {
+                    document.getElementById('connectionStatus').textContent = '🟡 Тестовый режим';
+                }
+            }
+        }
+
+        // Отправка данных в бота
+        function sendToBot(data) {
+            if (tg && isConnectedToBot && userId) {
+                const message = JSON.stringify(data);
+                tg.sendData(message);
+                addDebugMessage(`📤 Отправлено: ставка=${data.bet || 0}, выигрыш=${data.win || 0}, баланс=${data.balance_after || 0}`);
+                return true;
+            } else {
+                addDebugMessage(`❌ Не отправлено: tg=${!!tg}, connected=${isConnectedToBot}, userId=${userId}`, true);
+                return false;
+            }
+        }
+
+        // Синхронизация баланса с ботом
+        function syncBalanceToBot(bet, win, balanceAfter) {
+            if (!isConnectedToBot || !userId) {
+                addDebugMessage('❌ Синхронизация пропущена - нет подключения', true);
+                return false;
             }
             
-            const testData = {
+            const result = sendToBot({
                 action: 'spin_result',
                 user_id: userId,
-                bet: 25,
-                win: 100,
-                balance_after: 500,
+                bet: bet,
+                win: win,
+                balance_after: balanceAfter,
                 timestamp: new Date().toISOString()
-            };
+            });
             
-            tg.sendData(JSON.stringify(testData));
-            document.getElementById('status').innerHTML = '✅ Отправлено! Проверьте чат с ботом';
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.textContent = 'отправка...';
+            syncStatus.style.color = '#ffaa00';
+            
+            setTimeout(() => {
+                syncStatus.textContent = 'синхронизировано ✓';
+                syncStatus.style.color = '#00e676';
+            }, 1000);
+            
+            return result;
+        }
+
+        // Алиас для совместимости (чтобы работал вызов syncBalanceWithBot)
+        function syncBalanceWithBot(bet, win, balanceAfter) {
+            return syncBalanceToBot(bet, win, balanceAfter);
+        }
+
+        // ============ КОНФИГУРАЦИЯ СЛОТА ============
+        const ROWS = 5;
+        const COLS = 6;
+        const TOTAL_CELLS = ROWS * COLS;
+        const MAX_WIN_MULTIPLIER = 10000;
+
+        const SYMBOL_CONFIG = {
+            '💎': { minCount: 8, payTable: { 8: 0.4, 9: 0.8, 10: 1.5, 11: 3, 12: 6, 13: 12, 14: 25, 15: 50 } },
+            '❤️': { minCount: 8, payTable: { 8: 0.5, 9: 1, 10: 2, 11: 4, 12: 8, 13: 16, 14: 30, 15: 60 } },
+            '🌙': { minCount: 8, payTable: { 8: 0.6, 9: 1.2, 10: 2.5, 11: 5, 12: 10, 13: 20, 14: 40, 15: 80 } },
+            '⭐': { minCount: 8, payTable: { 8: 0.8, 9: 1.5, 10: 3, 11: 6, 12: 12, 13: 25, 14: 50, 15: 100 } },
+            '🔮': { minCount: 8, payTable: { 8: 1, 9: 2, 10: 4, 11: 8, 12: 16, 13: 30, 14: 60, 15: 120 } },
+            '🍀': { minCount: 8, payTable: { 8: 0.3, 9: 0.6, 10: 1.2, 11: 2.5, 12: 5, 13: 10, 14: 20, 15: 40 } },
+            '🎀': { minCount: 8, payTable: { 8: 0.7, 9: 1.4, 10: 2.8, 11: 5.5, 12: 11, 13: 22, 14: 45, 15: 90 } },
+            '🦋': { minCount: 8, payTable: { 8: 0.9, 9: 1.8, 10: 3.5, 11: 7, 12: 14, 13: 28, 14: 55, 15: 110 } },
         };
-        
-        document.getElementById('status').innerHTML = `🟢 Готов. User ID: ${userId || 'не найден'}`;
+
+        const SCATTER = '👑';
+        const MULTIPLIER_SYMBOL = '💖';
+        const MULTIPLIER_VALUES = [
+            { value: 2, weight: 300 }, { value: 3, weight: 250 }, { value: 4, weight: 200 },
+            { value: 5, weight: 180 }, { value: 6, weight: 150 }, { value: 8, weight: 120 },
+            { value: 10, weight: 100 }, { value: 12, weight: 80 }, { value: 15, weight: 60 },
+            { value: 20, weight: 40 }, { value: 25, weight: 25 }, { value: 50, weight: 10 },
+            { value: 100, weight: 4 }, { value: 250, weight: 1 }, { value: 500, weight: 1 },
+        ];
+
+        // ============ АУДИО ============
+        let sfxAudioCtx = null;
+        function initSFX() { if (!sfxAudioCtx) sfxAudioCtx = new(window.AudioContext || window.webkitAudioContext)(); if (sfxAudioCtx.state === 'suspended') sfxAudioCtx.resume(); }
+        function playTone(freq, duration, type = 'sine', vol = 0.08) { if (!sfxAudioCtx) return; try { const osc = sfxAudioCtx.createOscillator(); const gain = sfxAudioCtx.createGain(); osc.type = type; osc.frequency.setValueAtTime(freq, sfxAudioCtx.currentTime); gain.gain.setValueAtTime(vol, sfxAudioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, sfxAudioCtx.currentTime + duration); osc.connect(gain); gain.connect(sfxAudioCtx.destination); osc.start(); osc.stop(sfxAudioCtx.currentTime + duration); } catch(e) {} }
+        function soundSpin() { playTone(200, 0.3, 'triangle', 0.1); playTone(300, 0.2, 'triangle', 0.07); }
+        function soundWin() { playTone(523, 0.1, 'sine', 0.12); playTone(659, 0.1, 'sine', 0.12); playTone(784, 0.2, 'sine', 0.15); }
+        function soundBigWin() { playTone(523, 0.15, 'sine', 0.15); setTimeout(() => playTone(659, 0.15, 'sine', 0.15), 150); setTimeout(() => playTone(784, 0.2, 'sine', 0.18), 300); setTimeout(() => playTone(1047, 0.4, 'sine', 0.2), 450); }
+        function soundCascade() { playTone(400, 0.15, 'triangle', 0.08); }
+        function soundBonusTrigger() { playTone(600, 0.2, 'sine', 0.12); setTimeout(() => playTone(800, 0.2, 'sine', 0.12), 200); setTimeout(() => playTone(1000, 0.3, 'sine', 0.15), 400); }
+        function soundDrop() { playTone(150, 0.05, 'triangle', 0.04); }
+
+        // ============ МОДАЛЬНЫЕ ОКНА ============
+        function showModal(title, amount, subtitle = '', duration = 3000) {
+            const container = document.getElementById('modalContainer');
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `<div class="modal-box"><div class="modal-title">${title}</div><div class="modal-amount">${amount.toLocaleString()} ₽</div><div class="modal-subtitle">${subtitle}</div><button class="modal-btn modal-close-btn">✨ ПРОДОЛЖИТЬ ✨</button></div>`;
+            container.appendChild(overlay);
+            const closeBtn = overlay.querySelector('.modal-close-btn');
+            const closeModal = () => { overlay.style.animation = 'fadeIn 0.3s reverse'; setTimeout(() => overlay.remove(), 300); };
+            closeBtn.addEventListener('click', closeModal);
+            if (duration > 0) setTimeout(closeModal, duration);
+        }
+
+        // ============ СОСТОЯНИЕ ============
+        let balance = 0;
+        let currentBet = 25;
+        let anteBetActive = false;
+        let freespinsRemaining = 0;
+        let globalMultiplier = 1;
+        let isSpinning = false;
+        let grid = [];
+        let bonusTotalWin = 0;
+        let multiplierDropAllowed = false;
+        let multiplierDropCounter = 0;
+        const MULTIPLIER_DROP_INTERVAL_MIN = 3;
+        const MULTIPLIER_DROP_INTERVAL_MAX = 7;
+
+        // ============ DOM ЭЛЕМЕНТЫ ============
+        const gridEl = document.getElementById('grid');
+        const balanceEl = document.getElementById('balanceDisplay');
+        const winInfoEl = document.getElementById('winInfo');
+        const multiplierBadge = document.getElementById('multiplierBadge');
+        const freespinsBadge = document.getElementById('freespinsBadge');
+        const spinBtn = document.getElementById('spinBtn');
+        const buyBonusBtn = document.getElementById('buyBonusBtn');
+        const anteBetBtn = document.getElementById('anteBetBtn');
+        const betSelect = document.getElementById('betSelect');
+        const syncBtn = document.getElementById('syncBtn');
+
+        // ============ ЗВЁЗДЫ ============
+        function createStars() {
+            const container = document.getElementById('starsLayer');
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement('div');
+                star.className = 'star-particle';
+                const size = Math.random() * 3 + 1.5;
+                star.style.width = size + 'px';
+                star.style.height = size + 'px';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.setProperty('--dur', (Math.random() * 3 + 2) + 's');
+                star.style.setProperty('--delay', (Math.random() * 4) + 's');
+                container.appendChild(star);
+            }
+        }
+
+        // ============ ГЕНЕРАЦИЯ ============
+        function resetMultiplierDropTimer() { multiplierDropAllowed = false; multiplierDropCounter = Math.floor(Math.random() * (MULTIPLIER_DROP_INTERVAL_MAX - MULTIPLIER_DROP_INTERVAL_MIN + 1)) + MULTIPLIER_DROP_INTERVAL_MIN; }
+        function tickMultiplierTimer() { multiplierDropCounter--; if (multiplierDropCounter <= 0) multiplierDropAllowed = true; }
+
+        function randomSymbol() {
+            let allowMultiplier = multiplierDropAllowed && !freespinsRemaining;
+            if (freespinsRemaining > 0 && Math.random() < 0.08) allowMultiplier = true;
+            const weights = { '💎': 14, '❤️': 14, '🌙': 13, '⭐': 12, '🔮': 11, '🍀': 15, '🎀': 10, '🦋': 8, '👑': anteBetActive ? 5 : 2, '💖': allowMultiplier ? 6 : 0 };
+            if (!allowMultiplier && weights['💖'] !== undefined) weights['💖'] = 0;
+            const total = Object.values(weights).reduce((a, b) => a + b, 0);
+            let r = Math.random() * total;
+            for (const [sym, w] of Object.entries(weights)) { r -= w; if (r <= 0) return sym; }
+            return '💎';
+        }
+
+        function randomMultiplierValue() {
+            const totalWeight = MULTIPLIER_VALUES.reduce((sum, item) => sum + item.weight, 0);
+            let r = Math.random() * totalWeight;
+            for (const item of MULTIPLIER_VALUES) { r -= item.weight; if (r <= 0) return item.value; }
+            return 2;
+        }
+
+        function generateGrid(withDrop = false) {
+            const g = [];
+            let multipliersToPlace = 0;
+            if (multiplierDropAllowed && !freespinsRemaining) multipliersToPlace = Math.random() < 0.5 ? 1 : 2;
+            else if (freespinsRemaining > 0 && Math.random() < 0.08) multipliersToPlace = 1;
+            for (let r = 0; r < ROWS; r++) { const row = []; for (let c = 0; c < COLS; c++) row.push({ symbol: '', multiplier: null, winning: false, removing: false, dropping: withDrop }); g.push(row); }
+            const positions = []; for (let i = 0; i < TOTAL_CELLS; i++) positions.push(i);
+            for (let i = positions.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [positions[i], positions[j]] = [positions[j], positions[i]]; }
+            let multiplierPlaced = 0;
+            for (const pos of positions) {
+                const r = Math.floor(pos / COLS), c = pos % COLS;
+                if (multiplierPlaced < multipliersToPlace) { g[r][c].symbol = MULTIPLIER_SYMBOL; g[r][c].multiplier = randomMultiplierValue(); multiplierPlaced++; }
+                else { g[r][c].symbol = randomSymbol(); if (g[r][c].symbol === MULTIPLIER_SYMBOL) g[r][c].multiplier = randomMultiplierValue(); }
+            }
+            return g;
+        }
+
+        // ============ ВЫИГРЫШИ ============
+        function findWinningCombos(g) {
+            const counts = {};
+            for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const sym = g[r][c].symbol; if (sym === SCATTER || sym === MULTIPLIER_SYMBOL || !sym) continue; counts[sym] = (counts[sym] || 0) + 1; }
+            const winners = {};
+            for (const [sym, count] of Object.entries(counts)) { const config = SYMBOL_CONFIG[sym]; if (config && count >= config.minCount) { const thresholds = Object.keys(config.payTable).map(Number).sort((a, b) => a - b); let payMultiplier = 0; for (const thresh of thresholds) if (count >= thresh && config.payTable[thresh] > payMultiplier) payMultiplier = config.payTable[thresh]; if (payMultiplier > 0) winners[sym] = { count, payMultiplier }; } }
+            return winners;
+        }
+
+        function countScatters(g) { let cnt = 0; for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (g[r][c].symbol === SCATTER) cnt++; return cnt; }
+        function collectMultipliers(g) { let total = 0; for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (g[r][c].symbol === MULTIPLIER_SYMBOL && g[r][c].multiplier) total += g[r][c].multiplier; return total; }
+        function getWinningSymbolsSet(combos) { return new Set(Object.keys(combos)); }
+
+        // ============ ОТРИСОВКА ============
+        function renderGrid(winningSyms = new Set()) {
+            gridEl.innerHTML = '';
+            for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                const data = grid[r][c];
+                if (!data || !data.symbol) continue;
+                cell.dataset.symbol = data.symbol;
+                if (data.symbol === MULTIPLIER_SYMBOL && data.multiplier) { cell.textContent = '×' + data.multiplier; cell.classList.add('multiplier-cell'); }
+                else cell.textContent = data.symbol;
+                if (data.winning || winningSyms.has(data.symbol)) cell.classList.add('win');
+                if (data.removing) cell.classList.add('removing');
+                if (data.dropping) { cell.classList.add('dropping'); setTimeout(() => { if (grid[r] && grid[r][c]) grid[r][c].dropping = false; }, 500); }
+                gridEl.appendChild(cell);
+            }
+        }
+
+        // ============ КАСКАД ============
+        function removeWinningAndCascade(winningSyms) {
+            for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const sym = grid[r][c].symbol; if (winningSyms.has(sym) && sym !== SCATTER && sym !== MULTIPLIER_SYMBOL) grid[r][c].removing = true; if (sym === MULTIPLIER_SYMBOL) grid[r][c].removing = true; }
+            renderGrid(winningSyms);
+            soundCascade();
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    for (let c = 0; c < COLS; c++) {
+                        let col = [];
+                        for (let r = ROWS - 1; r >= 0; r--) if (!grid[r][c].removing) col.unshift({ ...grid[r][c], dropping: false, removing: false, winning: false });
+                        const newCount = ROWS - col.length;
+                        const newSymbols = [];
+                        for (let i = 0; i < newCount; i++) { const sym = randomSymbol(); newSymbols.push({ symbol: sym, multiplier: sym === MULTIPLIER_SYMBOL ? randomMultiplierValue() : null, winning: false, removing: false, dropping: true }); }
+                        col = [...newSymbols, ...col];
+                        for (let r = 0; r < ROWS; r++) grid[r][c] = col[r];
+                    }
+                    renderGrid(new Set());
+                    soundDrop();
+                    setTimeout(() => { for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) grid[r][c].dropping = false; resolve(); }, 500);
+                }, 400);
+            });
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        // ============ ГЛАВНЫЙ ЦИКЛ ===========
+        async function performSpin(isFreeSpin = false) {
+            if (isSpinning) return;
+            initSFX();
+            isSpinning = true;
+            spinBtn.disabled = true;
+            buyBonusBtn.disabled = true;
+            anteBetBtn.disabled = true;
+
+            let oldBalance = balance;  // Сохраняем баланс ДО спина
+
+            if (!isFreeSpin && freespinsRemaining === 0) {
+                if (balance < currentBet) { 
+                    winInfoEl.textContent = '❌ Недостаточно средств! Пополните баланс в боте.'; 
+                    isSpinning = false; 
+                    updateButtons(); 
+                    return; 
+                }
+                balance -= currentBet;
+                tickMultiplierTimer();
+            }
+            updateBalanceDisplay();
+            soundSpin();
+            winInfoEl.textContent = freespinsRemaining > 0 ? `🌀 Фриспин ${15 - freespinsRemaining + 1}/15...` : '🎰 Вращение...';
+
+            grid = generateGrid(true);
+            renderGrid();
+            await sleep(500);
+            for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) grid[r][c].dropping = false;
+            renderGrid();
+            await sleep(200);
+
+            let totalWin = 0;
+            let cascadeCount = 0;
+            const maxCascades = 15;
+
+            while (cascadeCount < maxCascades) {
+                const combos = findWinningCombos(grid);
+                const scatters = countScatters(grid);
+                const winningSyms = getWinningSymbolsSet(combos);
+
+                if (winningSyms.size === 0 && cascadeCount === 0 && scatters < 4 && freespinsRemaining === 0) { 
+                    winInfoEl.textContent = '💨 Нет выигрыша'; 
+                    break; 
+                }
+                if (winningSyms.size > 0) {
+                    const fieldMultipliers = collectMultipliers(grid);
+                    const effectiveMultiplier = (freespinsRemaining > 0 ? globalMultiplier : 1) + fieldMultipliers;
+                    let cascadeWin = 0;
+                    for (const [sym, info] of Object.entries(combos)) cascadeWin += currentBet * info.payMultiplier;
+                    cascadeWin = Math.floor(cascadeWin * effectiveMultiplier);
+                    const maxWinAmount = currentBet * MAX_WIN_MULTIPLIER;
+                    if (totalWin + cascadeWin > maxWinAmount) cascadeWin = maxWinAmount - totalWin;
+                    totalWin += cascadeWin;
+                    winInfoEl.textContent = `💎 +${cascadeWin} (×${effectiveMultiplier.toFixed(1)})`;
+                    updateMultiplierBadge(effectiveMultiplier);
+                    soundWin();
+                    renderGrid(winningSyms);
+                    await sleep(600);
+                    await removeWinningAndCascade(winningSyms);
+                    cascadeCount++;
+                    await sleep(200);
+                    if (totalWin >= maxWinAmount) { 
+                        winInfoEl.textContent = '🏆 MAX WIN ДОСТИГНУТ! 🏆'; 
+                        break; 
+                    }
+                } else break;
+            }
+
+            const finalScatters = countScatters(grid);
+            if (finalScatters >= 4 && freespinsRemaining === 0) {
+                freespinsRemaining = 15;
+                globalMultiplier = 1;
+                bonusTotalWin = 0;
+                winInfoEl.textContent = '🌟 БОНУС! 15 ФРИСПИНОВ! 🌟';
+                updateFreespinsBadge();
+                soundBonusTrigger();
+                showModal('🌟 БОНУСНАЯ ИГРА! 🌟', 15, 'Бесплатных вращений', 2500);
+            } else if (finalScatters >= 3 && freespinsRemaining > 0) {
+                freespinsRemaining += 5;
+                winInfoEl.textContent += ' +5 фриспинов!';
+                updateFreespinsBadge();
+                soundBonusTrigger();
+            }
+
+            if (totalWin > 0) {
+                balance += totalWin;
+                bonusTotalWin += totalWin;
+                winInfoEl.textContent = `🏆 Выигрыш: ${totalWin}`;
+                if (totalWin >= currentBet * 20) { 
+                    soundBigWin(); 
+                    showModal('💎 КРУПНЫЙ ВЫИГРЫШ! 💎', totalWin, totalWin >= currentBet * MAX_WIN_MULTIPLIER ? 'MAX WIN!' : 'Поздравляем!', 3500); 
+                }
+            }
+            updateBalanceDisplay();
+
+            // ========== ОТПРАВКА В БОТА ==========
+            if (isConnectedToBot && userId) {
+                syncBalanceWithBot(currentBet, totalWin, balance);
+                addDebugMessage(`💰 Отправка в бота: ставка=${currentBet}, выигрыш=${totalWin}, баланс=${balance}`);
+            }
+
+            if (freespinsRemaining > 0) {
+                const fieldMults = collectMultipliers(grid);
+                if (fieldMults > 0) globalMultiplier += fieldMults;
+                freespinsRemaining--;
+                updateFreespinsBadge();
+                updateMultiplierBadge(globalMultiplier);
+
+                if (freespinsRemaining > 0) {
+                    winInfoEl.textContent += ' | 🔄 Следующий фриспин...';
+                    grid = generateGrid();
+                    isSpinning = false;
+                    spinBtn.disabled = false;
+                    updateButtons();
+                    setTimeout(() => performSpin(true), 800);
+                    return;
+                } else {
+                    winInfoEl.textContent += ' | 🎉 Бонус завершён!';
+                    globalMultiplier = 1;
+                    updateMultiplierBadge(1);
+                    updateFreespinsBadge();
+                    if (bonusTotalWin > 0) { 
+                        soundBigWin(); 
+                        showModal('🎉 ИТОГИ БОНУСА 🎉', bonusTotalWin, 'Общий выигрыш за все фриспины', 4000); 
+                    }
+                    bonusTotalWin = 0;
+                }
+            }
+
+            if (!isFreeSpin && multiplierDropAllowed && !freespinsRemaining) resetMultiplierDropTimer();
+            isSpinning = false;
+            spinBtn.disabled = false;
+            buyBonusBtn.disabled = false;
+            anteBetBtn.disabled = false;
+            updateButtons();
+        }
+       
+        function buyBonus() {
+            if (isSpinning || freespinsRemaining > 0) return;
+            const cost = currentBet * 100;
+            if (balance < cost) { 
+                winInfoEl.textContent = '❌ Недостаточно средств (100x ставка)'; 
+                return; 
+            }
+            initSFX();
+            balance -= cost;
+            updateBalanceDisplay();
+            syncBalanceToBot(currentBet, 0, balance);
+            freespinsRemaining = 15;
+            globalMultiplier = 1;
+            bonusTotalWin = 0;
+            updateFreespinsBadge();
+            updateMultiplierBadge(1);
+            soundBonusTrigger();
+            showModal('🛒 БОНУС КУПЛЕН!', 15, 'Бесплатных вращений', 2500);
+            grid = generateGrid();
+            updateButtons();
+            setTimeout(() => performSpin(true), 600);
+        }
+
+        function updateBalanceDisplay() { balanceEl.textContent = balance.toLocaleString(); }
+        function updateMultiplierBadge(val) { if (val > 1) { multiplierBadge.style.display = 'inline'; multiplierBadge.textContent = '💥 ×' + val.toFixed(1); } else multiplierBadge.style.display = 'none'; }
+        function updateFreespinsBadge() { if (freespinsRemaining > 0) { freespinsBadge.style.display = 'inline'; freespinsBadge.textContent = '🌀 ' + freespinsRemaining; } else freespinsBadge.style.display = 'none'; }
+        function updateButtons() { const fs = freespinsRemaining > 0; spinBtn.textContent = fs ? '🌀 ФРИСПИН (' + freespinsRemaining + ')' : '🌀 ВРАЩАТЬ'; buyBonusBtn.disabled = isSpinning || fs; anteBetBtn.disabled = isSpinning || fs; spinBtn.disabled = isSpinning; }
+
+        function loadBalanceFromBot() {
+            const params = new URLSearchParams(window.location.search);
+            const balanceParam = params.get('balance');
+            if (balanceParam) {
+                balance = parseFloat(balanceParam) || 0;
+                updateBalanceDisplay();
+                addDebugMessage(`💰 Баланс загружен из URL: ${balance}`);
+            } else {
+                addDebugMessage(`⚠️ Баланс не передан в URL`, true);
+            }
+            updateBalanceDisplay();
+        }
+
+        // Ручная синхронизация
+        function manualSync() {
+            if (!isConnectedToBot) {
+                addDebugMessage('❌ Нет подключения к боту для синхронизации!', true);
+                return;
+            }
+            addDebugMessage(`🔄 Ручная синхронизация: баланс=${balance}`);
+            syncBalanceToBot(0, 0, balance);
+            winInfoEl.textContent = '💾 Баланс сохранён в боте!';
+            setTimeout(() => {
+                if (!isSpinning) winInfoEl.textContent = '🎰 Сделайте ставку';
+            }, 2000);
+        }
+
+        // ============ МУЗЫКА ============
+        let musicEnabled = true;
+        let backgroundMusic = null;
+        let musicVolume = 0.15;
+
+        function createBackgroundMusic() {
+            const audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+            
+            function playMelodyNote(freq, startTime, duration, gainNode) {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, startTime);
+                gain.gain.setValueAtTime(0, startTime);
+                gain.gain.linearRampToValueAtTime(musicVolume, startTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+                osc.connect(gain);
+                gain.connect(gainNode);
+                osc.start(startTime);
+                osc.stop(startTime + duration);
+            }
+
+            const melodyNotes = [262, 330, 392, 523, 330, 392, 523, 659, 294, 370, 440, 587, 330, 392, 523, 659];
+            const chordNotes = [[262, 330, 392], [294, 370, 440], [330, 392, 523], [262, 330, 392]];
+
+            function playMelodyLoop() {
+                if (!musicEnabled) return;
+                const now = audioCtx.currentTime;
+                const masterGain = audioCtx.createGain();
+                masterGain.gain.setValueAtTime(musicVolume, now);
+                masterGain.connect(audioCtx.destination);
+
+                melodyNotes.forEach((note, i) => playMelodyNote(note, now + i * 0.5, 0.4, masterGain));
+                chordNotes.forEach((chord, ci) => chord.forEach(note => playMelodyNote(note, now + ci * 2, 1.8, masterGain)));
+
+                setTimeout(playMelodyLoop, (melodyNotes.length * 0.5 * 1000) - 100);
+            }
+
+            playMelodyLoop();
+            return { stop: () => { musicEnabled = false; audioCtx.close(); } };
+        }
+
+        function toggleMusic() {
+            const btn = document.getElementById('musicToggle');
+            if (musicEnabled) {
+                musicEnabled = false;
+                btn.textContent = '🔇';
+                btn.classList.add('muted');
+                if (backgroundMusic) { backgroundMusic.stop(); backgroundMusic = null; }
+            } else {
+                musicEnabled = true;
+                btn.textContent = '🎵';
+                btn.classList.remove('muted');
+                backgroundMusic = createBackgroundMusic();
+            }
+        }
+
+        // ============ СОБЫТИЯ ============
+        spinBtn.addEventListener('click', () => { if (isSpinning) return; initSFX(); if (freespinsRemaining > 0) performSpin(true); else { grid = generateGrid(); performSpin(false); } });
+        buyBonusBtn.addEventListener('click', buyBonus);
+        syncBtn.addEventListener('click', manualSync);
+        anteBetBtn.addEventListener('click', () => { if (isSpinning || freespinsRemaining > 0) return; initSFX(); anteBetActive = !anteBetActive; anteBetBtn.style.background = anteBetActive ? 'linear-gradient(180deg, #ffb347, #e65100)' : 'linear-gradient(180deg, #6d3796, #3b1554)'; anteBetBtn.textContent = anteBetActive ? '⭐ Ante ON' : '⭐ Ante'; currentBet = anteBetActive ? Math.floor(currentBet * 1.25) : Math.floor(currentBet / 1.25); betSelect.value = currentBet; winInfoEl.textContent = anteBetActive ? '⭐ Ante: удвоенный шанс scatter' : '🎰 Ставка обычная'; });
+        betSelect.addEventListener('change', (e) => { currentBet = parseInt(e.target.value); anteBetActive = false; anteBetBtn.style.background = 'linear-gradient(180deg, #6d3796, #3b1554)'; anteBetBtn.textContent = '⭐ Ante'; winInfoEl.textContent = '🎰 Ставка: ' + currentBet; });
+        document.getElementById('musicToggle').addEventListener('click', toggleMusic);
+
+        // ============ ИНИЦИАЛИЗАЦИЯ ============
+        function init() {
+            initTelegram();
+            createStars();
+            resetMultiplierDropTimer();
+            loadBalanceFromBot();
+            grid = generateGrid();
+            renderGrid();
+            updateButtons();
+            backgroundMusic = createBackgroundMusic();
+            winInfoEl.textContent = '🎰 Money Star • Telegram Casino';
+            addDebugMessage('✨ Игра загружена!');
+        }
+
+        init();
     </script>
 </body>
 </html>
