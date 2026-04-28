@@ -629,7 +629,7 @@
                         for (let r = ROWS - 1; r >= 0; r--) if (!grid[r][c].removing) col.unshift({ ...grid[r][c], dropping: false, removing: false, winning: false });
                         const newCount = ROWS - col.length;
                         const newSymbols = [];
-                        for (let i = 0; i < newCount; i++) { const sym = randomSymbol(); newSymbols.push({ symbol: sym, multiplier: sym === MULTIPLIER_SYMBOL ? randomMultiplierValue() : null, winning: false, removing: false, dropping: true }); }
+                        for (let i = 0; i < newCount; i++) { const sym = randomSymbol); newSymbols.push({ symbol: sym, multiplier: sym === MULTIPLIER_SYMBOL ? randomMultiplierValue() : null, winning: false, removing: false, dropping: true }); }
                         col = [...newSymbols, ...col];
                         for (let r = 0; r < ROWS; r++) grid[r][c] = col[r];
                     }
@@ -642,143 +642,145 @@
 
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-        // ============ ГЛАВНЫЙ ЦИКЛ ============
+        // ============ ГЛАВНЫЙ ЦИКЛ ===========
         async function performSpin(isFreeSpin = false) {
-            if (isSpinning) return;
-            initSFX();
-            isSpinning = true;
-            spinBtn.disabled = true;
-            buyBonusBtn.disabled = true;
-            anteBetBtn.disabled = true;
+    if (isSpinning) return;
+    initSFX();
+    isSpinning = true;
+    spinBtn.disabled = true;
+    buyBonusBtn.disabled = true;
+    anteBetBtn.disabled = true;
 
-            let oldBalance = balance;
+    let oldBalance = balance;  // Сохраняем баланс ДО спина
 
-            if (!isFreeSpin && freespinsRemaining === 0) {
-                if (balance < currentBet) { 
-                    winInfoEl.textContent = '❌ Недостаточно средств! Пополните баланс в боте.'; 
-                    isSpinning = false; 
-                    updateButtons(); 
-                    return; 
-                }
-                balance -= currentBet;
-                tickMultiplierTimer();
-                addDebugMessage(`💰 Спин: ставка ${currentBet}, баланс был ${oldBalance}, стал ${balance}`);
-            }
-            updateBalanceDisplay();
-            soundSpin();
-            winInfoEl.textContent = freespinsRemaining > 0 ? `🌀 Фриспин ${15 - freespinsRemaining + 1}/15...` : '🎰 Вращение...';
+    if (!isFreeSpin && freespinsRemaining === 0) {
+        if (balance < currentBet) { 
+            winInfoEl.textContent = '❌ Недостаточно средств! Пополните баланс в боте.'; 
+            isSpinning = false; 
+            updateButtons(); 
+            return; 
+        }
+        balance -= currentBet;
+        tickMultiplierTimer();
+    }
+    updateBalanceDisplay();
+    soundSpin();
+    winInfoEl.textContent = freespinsRemaining > 0 ? `🌀 Фриспин ${15 - freespinsRemaining + 1}/15...` : '🎰 Вращение...';
 
-            grid = generateGrid(true);
-            renderGrid();
-            await sleep(500);
-            for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) grid[r][c].dropping = false;
-            renderGrid();
+    grid = generateGrid(true);
+    renderGrid();
+    await sleep(500);
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) grid[r][c].dropping = false;
+    renderGrid();
+    await sleep(200);
+
+    let totalWin = 0;
+    let cascadeCount = 0;
+    const maxCascades = 15;
+
+    while (cascadeCount < maxCascades) {
+        const combos = findWinningCombos(grid);
+        const scatters = countScatters(grid);
+        const winningSyms = getWinningSymbolsSet(combos);
+
+        if (winningSyms.size === 0 && cascadeCount === 0 && scatters < 4 && freespinsRemaining === 0) { 
+            winInfoEl.textContent = '💨 Нет выигрыша'; 
+            break; 
+        }
+        if (winningSyms.size > 0) {
+            const fieldMultipliers = collectMultipliers(grid);
+            const effectiveMultiplier = (freespinsRemaining > 0 ? globalMultiplier : 1) + fieldMultipliers;
+            let cascadeWin = 0;
+            for (const [sym, info] of Object.entries(combos)) cascadeWin += currentBet * info.payMultiplier;
+            cascadeWin = Math.floor(cascadeWin * effectiveMultiplier);
+            const maxWinAmount = currentBet * MAX_WIN_MULTIPLIER;
+            if (totalWin + cascadeWin > maxWinAmount) cascadeWin = maxWinAmount - totalWin;
+            totalWin += cascadeWin;
+            winInfoEl.textContent = `💎 +${cascadeWin} (×${effectiveMultiplier.toFixed(1)})`;
+            updateMultiplierBadge(effectiveMultiplier);
+            soundWin();
+            renderGrid(winningSyms);
+            await sleep(600);
+            await removeWinningAndCascade(winningSyms);
+            cascadeCount++;
             await sleep(200);
-
-            let totalWin = 0;
-            let cascadeCount = 0;
-            const maxCascades = 15;
-
-            while (cascadeCount < maxCascades) {
-                const combos = findWinningCombos(grid);
-                const scatters = countScatters(grid);
-                const winningSyms = getWinningSymbolsSet(combos);
-
-                if (winningSyms.size === 0 && cascadeCount === 0 && scatters < 4 && freespinsRemaining === 0) { 
-                    winInfoEl.textContent = '💨 Нет выигрыша'; 
-                    break; 
-                }
-                if (winningSyms.size > 0) {
-                    const fieldMultipliers = collectMultipliers(grid);
-                    const effectiveMultiplier = (freespinsRemaining > 0 ? globalMultiplier : 1) + fieldMultipliers;
-                    let cascadeWin = 0;
-                    for (const [sym, info] of Object.entries(combos)) cascadeWin += currentBet * info.payMultiplier;
-                    cascadeWin = Math.floor(cascadeWin * effectiveMultiplier);
-                    const maxWinAmount = currentBet * MAX_WIN_MULTIPLIER;
-                    if (totalWin + cascadeWin > maxWinAmount) cascadeWin = maxWinAmount - totalWin;
-                    totalWin += cascadeWin;
-                    winInfoEl.textContent = `💎 +${cascadeWin} (×${effectiveMultiplier.toFixed(1)})`;
-                    updateMultiplierBadge(effectiveMultiplier);
-                    soundWin();
-                    renderGrid(winningSyms);
-                    await sleep(600);
-                    await removeWinningAndCascade(winningSyms);
-                    cascadeCount++;
-                    await sleep(200);
-                    if (totalWin >= maxWinAmount) { 
-                        winInfoEl.textContent = '🏆 MAX WIN ДОСТИГНУТ! 🏆'; 
-                        break; 
-                    }
-                } else break;
+            if (totalWin >= maxWinAmount) { 
+                winInfoEl.textContent = '🏆 MAX WIN ДОСТИГНУТ! 🏆'; 
+                break; 
             }
+        } else break;
+    }
 
-            const finalScatters = countScatters(grid);
-            if (finalScatters >= 4 && freespinsRemaining === 0) {
-                freespinsRemaining = 15;
-                globalMultiplier = 1;
-                bonusTotalWin = 0;
-                winInfoEl.textContent = '🌟 БОНУС! 15 ФРИСПИНОВ! 🌟';
-                updateFreespinsBadge();
-                soundBonusTrigger();
-                showModal('🌟 БОНУСНАЯ ИГРА! 🌟', 15, 'Бесплатных вращений', 2500);
-            } else if (finalScatters >= 3 && freespinsRemaining > 0) {
-                freespinsRemaining += 5;
-                winInfoEl.textContent += ' +5 фриспинов!';
-                updateFreespinsBadge();
-                soundBonusTrigger();
-            }
+    const finalScatters = countScatters(grid);
+    if (finalScatters >= 4 && freespinsRemaining === 0) {
+        freespinsRemaining = 15;
+        globalMultiplier = 1;
+        bonusTotalWin = 0;
+        winInfoEl.textContent = '🌟 БОНУС! 15 ФРИСПИНОВ! 🌟';
+        updateFreespinsBadge();
+        soundBonusTrigger();
+        showModal('🌟 БОНУСНАЯ ИГРА! 🌟', 15, 'Бесплатных вращений', 2500);
+    } else if (finalScatters >= 3 && freespinsRemaining > 0) {
+        freespinsRemaining += 5;
+        winInfoEl.textContent += ' +5 фриспинов!';
+        updateFreespinsBadge();
+        soundBonusTrigger();
+    }
 
-            if (totalWin > 0) {
-                balance += totalWin;
-                bonusTotalWin += totalWin;
-                winInfoEl.textContent = `🏆 Выигрыш: ${totalWin}`;
-                addDebugMessage(`🎉 Выигрыш: +${totalWin}, новый баланс: ${balance}`);
-                if (totalWin >= currentBet * 20) { 
-                    soundBigWin(); 
-                    showModal('💎 КРУПНЫЙ ВЫИГРЫШ! 💎', totalWin, totalWin >= currentBet * MAX_WIN_MULTIPLIER ? 'MAX WIN!' : 'Поздравляем!', 3500); 
-                }
-            }
-            updateBalanceDisplay();
+    if (totalWin > 0) {
+        balance += totalWin;
+        bonusTotalWin += totalWin;
+        winInfoEl.textContent = `🏆 Выигрыш: ${totalWin}`;
+        if (totalWin >= currentBet * 20) { 
+            soundBigWin(); 
+            showModal('💎 КРУПНЫЙ ВЫИГРЫШ! 💎', totalWin, totalWin >= currentBet * MAX_WIN_MULTIPLIER ? 'MAX WIN!' : 'Поздравляем!', 3500); 
+        }
+    }
+    updateBalanceDisplay();
 
-            // ОТПРАВКА В БОТА - КЛЮЧЕВОЙ МОМЕНТ!
-            addDebugMessage(`🔄 Отправка в бота: ставка=${currentBet}, выигрыш=${totalWin}, баланс=${balance}`);
-            syncBalanceToBot(currentBet, totalWin, balance);
+    // ========== ОТПРАВКА В БОТА (ДОБАВЛЕНО) ==========
+    if (isConnectedToBot && userId) {
+        const netChange = totalWin - (oldBalance - balance);
+        syncBalanceWithBot(currentBet, totalWin, balance);
+        console.log('💰 Spin saved:', { bet: currentBet, win: totalWin, balance: balance });
+    }
 
-            if (freespinsRemaining > 0) {
-                const fieldMults = collectMultipliers(grid);
-                if (fieldMults > 0) globalMultiplier += fieldMults;
-                freespinsRemaining--;
-                updateFreespinsBadge();
-                updateMultiplierBadge(globalMultiplier);
+    if (freespinsRemaining > 0) {
+        const fieldMults = collectMultipliers(grid);
+        if (fieldMults > 0) globalMultiplier += fieldMults;
+        freespinsRemaining--;
+        updateFreespinsBadge();
+        updateMultiplierBadge(globalMultiplier);
 
-                if (freespinsRemaining > 0) {
-                    winInfoEl.textContent += ' | 🔄 Следующий фриспин...';
-                    grid = generateGrid();
-                    isSpinning = false;
-                    spinBtn.disabled = false;
-                    updateButtons();
-                    setTimeout(() => performSpin(true), 800);
-                    return;
-                } else {
-                    winInfoEl.textContent += ' | 🎉 Бонус завершён!';
-                    globalMultiplier = 1;
-                    updateMultiplierBadge(1);
-                    updateFreespinsBadge();
-                    if (bonusTotalWin > 0) { 
-                        soundBigWin(); 
-                        showModal('🎉 ИТОГИ БОНУСА 🎉', bonusTotalWin, 'Общий выигрыш за все фриспины', 4000); 
-                    }
-                    bonusTotalWin = 0;
-                }
-            }
-
-            if (!isFreeSpin && multiplierDropAllowed && !freespinsRemaining) resetMultiplierDropTimer();
+        if (freespinsRemaining > 0) {
+            winInfoEl.textContent += ' | 🔄 Следующий фриспин...';
+            grid = generateGrid();
             isSpinning = false;
             spinBtn.disabled = false;
-            buyBonusBtn.disabled = false;
-            anteBetBtn.disabled = false;
             updateButtons();
+            setTimeout(() => performSpin(true), 800);
+            return;
+        } else {
+            winInfoEl.textContent += ' | 🎉 Бонус завершён!';
+            globalMultiplier = 1;
+            updateMultiplierBadge(1);
+            updateFreespinsBadge();
+            if (bonusTotalWin > 0) { 
+                soundBigWin(); 
+                showModal('🎉 ИТОГИ БОНУСА 🎉', bonusTotalWin, 'Общий выигрыш за все фриспины', 4000); 
+            }
+            bonusTotalWin = 0;
         }
+    }
+
+    if (!isFreeSpin && multiplierDropAllowed && !freespinsRemaining) resetMultiplierDropTimer();
+    isSpinning = false;
+    spinBtn.disabled = false;
+    buyBonusBtn.disabled = false;
+    anteBetBtn.disabled = false;
+    updateButtons();
+        }
+       
 
         function buyBonus() {
             if (isSpinning || freespinsRemaining > 0) return;
