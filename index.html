@@ -635,11 +635,18 @@
                     isConnectedToBot = true;
                     document.getElementById('connectionStatus').textContent = '🟢 Подключено к боту';
                     document.getElementById('connectionStatus').classList.remove('disconnected');
+                    
+                    // Запрашиваем актуальный баланс у бота при загрузке
+                    setTimeout(() => {
+                        sendToBot({ action: 'get_balance', user_id: userId });
+                    }, 500);
                 } else {
                     const params = new URLSearchParams(window.location.search);
                     userId = params.get('user_id');
                     if (userId) {
                         isConnectedToBot = true;
+                        document.getElementById('connectionStatus').textContent = '🟢 Подключено к боту';
+                        document.getElementById('connectionStatus').classList.remove('disconnected');
                     } else {
                         document.getElementById('connectionStatus').textContent = '🔴 Демо-режим';
                         document.getElementById('connectionStatus').classList.add('disconnected');
@@ -674,6 +681,7 @@
                     balance_after: newBalance,
                     timestamp: new Date().toISOString()
                 });
+                console.log(`Spin synced: bet=${bet}, win=${win}, balance=${newBalance}`);
             } else {
                 sendToBot({
                     action: 'balance_update',
@@ -1000,6 +1008,8 @@
 
             // СИНХРОНИЗАЦИЯ С БОТОМ ПОСЛЕ КАЖДОГО СПИНА
             syncBalanceWithBot(balance, currentBet, totalWin);
+            document.getElementById('syncStatus').textContent = 'синхронизировано ✓';
+            document.getElementById('syncStatus').style.color = '#00e676';
 
             if (freespinsRemaining > 0) {
                 const fieldMults = collectMultipliers(grid);
@@ -1062,8 +1072,13 @@
         function loadBalanceFromBot() {
             const params = new URLSearchParams(window.location.search);
             const balanceParam = params.get('balance');
-            if (balanceParam) balance = parseFloat(balanceParam) || 0;
+            if (balanceParam) {
+                balance = parseFloat(balanceParam) || 0;
+                updateBalanceDisplay();
+                console.log('Balance loaded from URL:', balance);
+            }
             updateBalanceDisplay();
+            document.getElementById('syncStatus').textContent = userId ? 'синхронизировано ✓' : 'демо-режим';
         }
 
         spinBtn.addEventListener('click', () => { if (isSpinning) return; initSFX(); if (freespinsRemaining > 0) performSpin(true); else { grid = generateGrid(); performSpin(false); } });
@@ -1082,7 +1097,6 @@
             updateButtons();
             backgroundMusic = createBackgroundMusic();
             winInfoEl.textContent = '🎰 Money Star • Telegram Casino';
-            document.getElementById('syncStatus').textContent = userId ? 'синхронизировано ✓' : 'демо-режим';
         }
 
         init();
